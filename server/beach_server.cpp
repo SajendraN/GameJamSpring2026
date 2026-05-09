@@ -140,13 +140,14 @@ void DrawTutorial();
 
 
 const Color SAND_GROUND = { 236, 224, 191, 255 };
+const Color SAND_GROUND2 = { 250, 235, 200, 255 };
 const Color SAND_PACKED = { 215, 195, 145, 255 };
 const Color SAND_WET = { 180, 150, 110, 255 };
 const Color SAND_BRIGHT = { 255, 248, 230, 255 };
 
-const Color SAND_COLORS[] = { SAND_GROUND, SAND_PACKED, SAND_WET, SAND_BRIGHT };
+const Color SAND_COLORS[] = { SAND_PACKED, SAND_GROUND2, SAND_WET, SAND_BRIGHT };
 const int numSandColors = 4;
-int currentSandColor = 1;
+int currentSandColor = 0;
 
 const int GRID_SIZE = 50;
 const float GRID_MID = GRID_SIZE / 2;
@@ -381,8 +382,8 @@ void UpdateTutorial() {
         GridPostionAtLocation(cameraTutorial.target, i, j);
         if (i >= GRID_SIZE || j >= GRID_SIZE)
             return;
-        sandGrid[i][j]++;
         sandGridColors[i][j][sandGrid[i][j]] = currentSandColor++;
+        sandGrid[i][j]++;
         currentSandColor %= numSandColors;
     }
 }
