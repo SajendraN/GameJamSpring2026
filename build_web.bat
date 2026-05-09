@@ -28,7 +28,7 @@ cmake --build .
 cd bin
 
 :: stop here
-exit /B
+:: exit /B
 
 echo.
 echo Launching local server...

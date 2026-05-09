@@ -33,6 +33,8 @@
 #undef PlaySoundA
 
 #include "raylib.h"
+#define RAYGUI_IMPLEMENTATION //only in this cpp file
+#include "raygui.h" // in any cpp file that needs it
 
 #include <iostream>
 #include <string>
@@ -87,6 +89,7 @@ void OnClientConnection(std::weak_ptr<ix::WebSocket> webSocket, std::shared_ptr<
 //shit this should be shared client and server somehow, fix folder layout later
 enum GameMode {
     GAME_MODE_TITLE_SCREEN = 0,
+    GAME_MODE_TUTORIAL,
     GAME_MODE_PLAYING,
     GAME_MODE_VIEWING,
     GAME_MODE_JUDGING,
@@ -96,7 +99,8 @@ enum GameMode {
 };
 
 struct TitleSequence {
-    static const int NUM_FRAMES = 72;
+    //static const int NUM_FRAMES = 72;
+    static const int NUM_FRAMES = 7;
     
     Texture2D frames[NUM_FRAMES];
 
@@ -119,6 +123,20 @@ void UpdateTitleScreen(TitleSequence& seq);
 void DrawTitleSequence(const TitleSequence& ts);
 void DeInitTitleScreen(TitleSequence& ts);
 
+//state change
+void UpdateGameMode(GameMode& gm);
+
+//ui stuff
+TitleSequence titleScreen;
+bool showTutorialButton = true;
+bool tutorialButtonWasPressed = false;
+
+void DrawCorrectGameMode(const GameMode& gm);
+void DrawUI();
+void DrawTitleScreen();
+void DrawTutorial();
+
+
 int main() {
     ix::initNetSystem();
     ix::WebSocketServer server(PORT, "0.0.0.0");
@@ -136,7 +154,6 @@ int main() {
     SetTargetFPS(60);
     GameMode currentGameMode = GAME_MODE_TITLE_SCREEN;
     
-    TitleSequence titleScreen;
     //draw and load first texture to buy time during loading
     titleScreen.frames[0] = LoadTexture(ASSET_DIR"/title_screen/wcscbg_000.png");
     BeginDrawing(); DrawTexture(titleScreen.frames[0], 0, 0, WHITE); EndDrawing();
@@ -148,6 +165,8 @@ int main() {
     Music theTrack = LoadMusicStream(ASSET_DIR"/music/complete_soundtrack.mp3");
     SetMusicVolume(theTrack, 1.0);
     PlayMusicStream(theTrack);
+
+    
     
 
     while( !WindowShouldClose() ) {
@@ -165,7 +184,8 @@ int main() {
 
         //UPDATE
         // 
-        UpdateTitleScreen(titleScreen);
+        UpdateGameMode(currentGameMode);
+        
         // 2. Broadcast Tick (20Hz)
         double now = GetTime();
         if (now - lastBroadcast >= 0.05) {
@@ -185,20 +205,20 @@ int main() {
         }
 
         //DRAW
-        BeginDrawing();
-        ClearBackground(BLACK);
+        BeginDrawing(); {
+            ClearBackground(BLACK);
+            DrawCorrectGameMode(currentGameMode);
 
-        DrawTitleSequence(titleScreen);
 
-        DrawCircleV(serverPos, 25, RED); // Server is Red
-        DrawText("SERVER (YOU)", serverPos.x - 30, serverPos.y + 30, 10, RED);
+            DrawCircleV(serverPos, 25, RED); // Server is Red
+            DrawText("SERVER (YOU)", serverPos.x - 30, serverPos.y + 30, 10, RED);
 
-        dataMtx.lock();
-        for (auto const& [socket, pos] : clientPositions) {
-            DrawCircleV(pos, 20, BLUE); // Clients are Blue
-        }
-        dataMtx.unlock();
-        EndDrawing();
+            dataMtx.lock();
+            for (auto const& [socket, pos] : clientPositions) {
+                DrawCircleV(pos, 20, BLUE); // Clients are Blue
+            }
+            dataMtx.unlock();
+        } EndDrawing();
     }
 
     server.stop();
@@ -258,3 +278,47 @@ void DeInitTitleScreen(TitleSequence& ts) {
     for (Texture2D& texture : ts.frames)
         UnloadTexture(texture);
 }
+
+void UpdateGameMode(GameMode& gm) {
+    switch (gm) {
+    case GAME_MODE_TITLE_SCREEN:
+        UpdateTitleScreen(titleScreen);
+        if(tutorialButtonWasPressed)
+            gm = GAME_MODE_TUTORIAL;
+
+    }
+}
+
+void DrawCorrectGameMode(const GameMode& gm) {
+    switch (gm) {
+    case GAME_MODE_TITLE_SCREEN:
+        DrawTitleScreen();
+        break;
+    case GAME_MODE_TUTORIAL:
+        DrawTutorial();
+        break;
+        
+
+    default:
+        puts("ERROR UNEXPECTED DRAW MODE ERROR");
+    }
+}
+
+void DrawTitleScreen() {
+    DrawTitleSequence(titleScreen);
+    DrawUI();
+}
+
+void DrawUI() {
+    if (showTutorialButton && GuiButton(Rectangle{ 1100, 100, 120, 24 }, "TUTORIAL")) {
+        showTutorialButton = false;
+        tutorialButtonWasPressed = true;
+    }
+}
+
+
+void DrawTutorial() {
+    DrawText("This is a Tutorial...!", 20, 20, 30, WHITE);
+}
+
+
