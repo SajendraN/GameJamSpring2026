@@ -141,7 +141,7 @@ int main() {
     nativeSocket.start();
 #endif
 
-    // 2. Raylib Init
+    
     InitWindow(800, 450, "Multiplayer Client");
     SetTargetFPS(60);
 

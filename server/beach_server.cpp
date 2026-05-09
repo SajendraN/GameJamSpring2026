@@ -39,13 +39,22 @@
 #include <map>
 #include <mutex>
 
+#define PORT 8080
+//networking crap to rerwite
+//research AI disclosure: https://share.google/aimode/JZ7hl00SIDsgVpG89
+// libraries to consider: 
+// easywsclient for client
+// wsServer (server) ? 
+// mongoose.ws (client/server)
+
 // --- State ---
+std::mutex dataMtx;
 Vector2 serverPos = { 400, 225 }; // Server's own circle
 std::map<ix::WebSocket*, Vector2> clientPositions;
-std::mutex dataMtx;
 
 void HandleClientMessage(std::shared_ptr<ix::WebSocket> socket, const ix::WebSocketMessagePtr& msg) {
     if (msg->type == ix::WebSocketMessageType::Open) {
+        //std::cout << "Client connected - " << msg.get()
         std::lock_guard<std::mutex> lock(dataMtx);
         clientPositions[socket.get()] = { -100, -100 }; // Start off-screen
     }
@@ -62,6 +71,8 @@ void HandleClientMessage(std::shared_ptr<ix::WebSocket> socket, const ix::WebSoc
     }
 }
 
+
+//reference https://machinezone.github.io/IXWebSocket/usage/
 void OnClientConnection(std::weak_ptr<ix::WebSocket> webSocket, std::shared_ptr<ix::ConnectionState> state) {
     auto socket = webSocket.lock();
     if (socket) {
@@ -71,7 +82,42 @@ void OnClientConnection(std::weak_ptr<ix::WebSocket> webSocket, std::shared_ptr<
     }
 }
 
-#define PORT 8080
+
+
+//shit this should be shared client and server somehow, fix folder layout later
+enum GameMode {
+    GAME_MODE_TITLE_SCREEN = 0,
+    GAME_MODE_PLAYING,
+    GAME_MODE_VIEWING,
+    GAME_MODE_JUDGING,
+    GAME_MODE_SCORE,
+    GAME_MODE_GAME_OVER,
+    GAME_MODE_WIN_SCREEN
+};
+
+struct TitleSequence {
+    static const int NUM_FRAMES = 72;
+    
+    Texture2D frames[NUM_FRAMES];
+
+    int currentFrame = 0;
+
+    float timer = 0.0f;
+    float frameTime = 1 / 10.0f;
+
+    bool pingPong = true;
+    bool reverse = false;
+};
+
+
+//fuck it, deal with file paths later
+#define ASSET_DIR "C:/assets"
+
+//must be called after create window: loads textures (needs GPU context)
+void InitTitleScreen(TitleSequence &ts, const char* sub_folder, const char* filenamebase);
+void UpdateTitleScreen(TitleSequence& seq);
+void DrawTitleSequence(const TitleSequence& ts);
+void DeInitTitleScreen(TitleSequence& ts);
 
 int main() {
     ix::initNetSystem();
@@ -84,20 +130,36 @@ int main() {
         return 1;
     }
     server.start();
-
-    InitWindow(800, 450, "Server - Keys to Move");
-    SetTargetFPS(60);
-
     double lastBroadcast = 0;
 
-    while (!WindowShouldClose()) {
-        // 1. Move Server Circle (Keyboard)
+    InitWindow(1280, 720, "Server - Keys to Move");
+    SetTargetFPS(60);
+    GameMode currentGameMode = GAME_MODE_TITLE_SCREEN;
+    
+    TitleSequence titleScreen;
+    //draw and load first texture to buy time during loading
+    titleScreen.frames[0] = LoadTexture(ASSET_DIR"/title_screen/wcscbg_000.png");
+    BeginDrawing(); DrawTexture(titleScreen.frames[0], 0, 0, WHITE); EndDrawing();
+    
+    //worry about slow loading later
+    InitTitleScreen(titleScreen, "title_screen", "wcscbg"); //worry about de-init and unload images later
+
+    
+
+    while( !WindowShouldClose() ) {
+        //CHECK INPUT
+        
+        // Move Server Circle (Keyboard)
         float speed = 200.0f * GetFrameTime();
         if (IsKeyDown(KEY_RIGHT)) serverPos.x += speed;
         if (IsKeyDown(KEY_LEFT))  serverPos.x -= speed;
         if (IsKeyDown(KEY_UP))    serverPos.y -= speed;
         if (IsKeyDown(KEY_DOWN))  serverPos.y += speed;
 
+
+        //UPDATE
+        // 
+        UpdateTitleScreen(titleScreen);
         // 2. Broadcast Tick (20Hz)
         double now = GetTime();
         if (now - lastBroadcast >= 0.05) {
@@ -116,9 +178,12 @@ int main() {
             lastBroadcast = now;
         }
 
-        // 3. Draw Local View
+        //DRAW
         BeginDrawing();
         ClearBackground(BLACK);
+
+        DrawTitleSequence(titleScreen);
+
         DrawCircleV(serverPos, 25, RED); // Server is Red
         DrawText("SERVER (YOU)", serverPos.x - 30, serverPos.y + 30, 10, RED);
 
@@ -133,4 +198,53 @@ int main() {
     server.stop();
     ix::uninitNetSystem();
     return 0;
+}
+
+void InitTitleScreen(TitleSequence &ts, const char* sub_folder, const char* filenamebase) {
+    for (int i = 0; i < ts.NUM_FRAMES; i++) {
+        const char* path = TextFormat("%s/%s/%s_%03d.png", ASSET_DIR, sub_folder, filenamebase);
+        
+        Texture2D texture = LoadTexture(path);
+        //error checking ignored...
+
+        ts.frames[i] = texture;
+    }
+}
+
+void UpdateTitleScreen(TitleSequence& seq) {
+    seq.timer += GetFrameTime();
+    
+    if (seq.timer >= seq.frameTime) {
+        seq.timer -= seq.frameTime;
+
+        if (!seq.reverse) { //going forward
+            seq.currentFrame++;
+
+            if (seq.currentFrame >= seq.NUM_FRAMES) {
+                if (seq.pingPong) {
+                    seq.currentFrame = seq.NUM_FRAMES - 1;
+                    seq.reverse = true;
+                } else {
+                    seq.currentFrame = 0;
+                }
+            }
+        
+        } else { //else in reverse
+            seq.currentFrame--;
+
+            if (seq.currentFrame < 0) {
+                seq.currentFrame = 0;
+                seq.reverse = false;
+            }
+        } //end else
+    } //end timer wait
+}//end update title screen
+
+void DrawTitleSequence(const TitleSequence& ts) {
+    DrawTexture(ts.frames[ts.currentFrame], 0, 0, WHITE);
+}
+
+void DeInitTitleScreen(TitleSequence& ts) {
+    for (Texture2D& texture : ts.frames)
+        UnloadTexture(texture);
 }
