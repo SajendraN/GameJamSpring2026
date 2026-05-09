@@ -138,15 +138,24 @@ void InitTutorial();
 void UpdateTutorial();
 void DrawTutorial();
 
+
+const Color SAND_GROUND = { 236, 224, 191, 255 };
+const Color SAND_PACKED = { 215, 195, 145, 255 };
 const int GRID_SIZE = 50;
+const float GRID_MID = GRID_SIZE / 2;
 int sandGrid[GRID_SIZE][GRID_SIZE] = { 0 };
 
-Vector3 PositionAtGrid(int i, int j) {
-    return Vector3{ -GRID_SIZE/2.0f + i, 0, -GRID_SIZE / 2.0f + j};
+Vector3 LocationAtGridPosition(int i, int j) {
+    return Vector3{ -GRID_MID + i, 0, -GRID_MID + j};
+}
+
+void GridPostionAtLocation(Vector3 location, int& i, int &j) {
+    i = (int)location.x + GRID_MID;
+    j = (int)location.z + GRID_MID;;
 }
 
 
-const Color SAND = { 236, 224, 191, 255 };
+
 
 // Setup player 1 camera and screen
 int cameraMode = CAMERA_FIRST_PERSON;
@@ -154,11 +163,6 @@ Camera cameraTutorial;
 
 
 int main() {
-    sandGrid[0][0] = 10;
-    sandGrid[49][0] = 10;
-    sandGrid[0][49] = 10;
-    sandGrid[49][49] = 10;
-
     ix::initNetSystem();
     ix::WebSocketServer server(PORT, "0.0.0.0");
     server.setOnConnectionCallback(OnClientConnection);
@@ -358,6 +362,11 @@ void UpdateTutorial() {
     // Some default standard keyboard/mouse inputs are hardcoded to simplify use
     // For advanced camera controls, it's recommended to compute camera movement manually
     UpdateCamera(&cameraTutorial, cameraMode);
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        int i, j;
+        GridPostionAtLocation(cameraTutorial.target, i, j);
+        sandGrid[i][j]++;
+    }
 }
 
 void DrawTutorial() {
@@ -365,7 +374,7 @@ void DrawTutorial() {
     DrawText("This is a Tutorial...!", 20, 20, 30, WHITE);
     BeginMode3D(cameraTutorial); {
         // Draw scene: line of cube trees on a plane to make a "world"
-        DrawPlane( Vector3{0, 0, 0}, Vector2{50, 50}, SAND); // Simple world plane
+        DrawPlane( Vector3{0, 0, 0}, Vector2{50, 50}, SAND_GROUND); // Simple world plane
 
         //reference trees
         int count = 5;
@@ -386,9 +395,9 @@ void DrawTutorial() {
             for(int j = 0; j < GRID_SIZE; j++) {
                 int height = sandGrid[i][j];
                 for(int h = 0; h < height; h++) {
-                    Vector3 location = PositionAtGrid(i, j);
+                    Vector3 location = LocationAtGridPosition(i, j);
                     location.y = h;
-                    DrawCube(location, 1, 1, 1, BLUE);
+                    DrawCube(location, 1, 1, 1, SAND_PACKED);
                 }
             }
         }
