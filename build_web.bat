@@ -27,6 +27,9 @@ cmake --build .
 
 cd bin
 
+:: stop here
+exit /B
+
 echo.
 echo Launching local server...
 start "Game Server" python -m http.server 80
