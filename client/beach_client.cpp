@@ -126,7 +126,11 @@ void UpdateWorldState(std::string data) {
 }
 
 //#define URL "wss://tribune-dragonfly-roundworm.ngrok-free.dev"
-#define WS_URL "ws://192.168.140.92:8080"
+//#define WS_URL "ws://192.168.140.92:8080"
+#define WS_URL "ws://192.168.140.175:8080"
+
+const Color SAND_GROUND = { 236, 224, 191, 255 };
+
 
 int main() {
     // 1. Networking Init
@@ -142,13 +146,13 @@ int main() {
 #endif
 
     
-    InitWindow(800, 450, "Multiplayer Client");
+    InitWindow(500, 500, "Multiplayer Client");
     SetTargetFPS(60);
 
     while (!WindowShouldClose()) {
         // --- POLL NETWORK ---
         inbox.mtx.lock();
-        while (!inbox.queue.empty()) {
+        while( !inbox.queue.empty() ) {
             UpdateWorldState(inbox.queue.front());
             inbox.queue.pop_front();
         }
@@ -164,14 +168,24 @@ int main() {
 
         // --- DRAW ---
         BeginDrawing();
-            ClearBackground(RAYWHITE);
+            ClearBackground(SAND_GROUND);
+            //reference water
+            DrawRectangle(0, 475, 500, 25, BLUE);
+            
+            //reference trees
+            for (int i = 0; i < 10; i++) {
+                DrawRectangle(i * 50 + 25, 20, 10, 30, BROWN);
+                DrawPoly(Vector2{ i * 50.0f + 30, 15 },13, 15, -90, GREEN);
+            }
+
 
             for (const auto& player : worldState) {
                 DrawCircleV(player.pos, 20, player.color);
             }
-
-            if (!NetConnected()) DrawText("OFFLINE", 10, 10, 20, RED);
-            else DrawText("ONLINE", 10, 10, 20, GREEN);
+            if( !NetConnected() ) 
+                DrawText("OFFLINE", 10, 10, 20, RED);
+            else 
+                DrawText("ONLINE", 10, 10, 20, GREEN);
         EndDrawing();
     }
 
