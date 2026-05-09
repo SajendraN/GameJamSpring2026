@@ -138,6 +138,14 @@ void InitTutorial();
 void UpdateTutorial();
 void DrawTutorial();
 
+const int GRID_SIZE = 50;
+int sandGrid[GRID_SIZE][GRID_SIZE] = { 0 };
+
+Vector3 PositionAtGrid(int i, int j) {
+    return Vector3{ -GRID_SIZE/2.0f + i, 0, -GRID_SIZE / 2.0f + j};
+}
+
+
 const Color SAND = { 236, 224, 191, 255 };
 
 // Setup player 1 camera and screen
@@ -146,6 +154,11 @@ Camera cameraTutorial;
 
 
 int main() {
+    sandGrid[0][0] = 10;
+    sandGrid[49][0] = 10;
+    sandGrid[0][49] = 10;
+    sandGrid[49][49] = 10;
+
     ix::initNetSystem();
     ix::WebSocketServer server(PORT, "0.0.0.0");
     server.setOnConnectionCallback(OnClientConnection);
@@ -295,8 +308,10 @@ void UpdateGameMode(GameMode& gm) {
             InitTutorial();
             gm = GAME_MODE_TUTORIAL;
         }
+        break;
     case GAME_MODE_TUTORIAL:
         UpdateTutorial();
+        break;
     }
 }
 
@@ -349,7 +364,7 @@ void DrawTutorial() {
     ClearBackground(SKYBLUE);
     DrawText("This is a Tutorial...!", 20, 20, 30, WHITE);
     BeginMode3D(cameraTutorial); {
-        // Draw scene: grid of cube trees on a plane to make a "world"
+        // Draw scene: line of cube trees on a plane to make a "world"
         DrawPlane( Vector3{0, 0, 0}, Vector2{50, 50}, SAND); // Simple world plane
 
         //reference trees
@@ -366,6 +381,17 @@ void DrawTutorial() {
 
         //player cube
         DrawCube(cameraTutorial.position, 1, 1, 1, RED);
+
+        for(int i = 0; i < GRID_SIZE; i++) {
+            for(int j = 0; j < GRID_SIZE; j++) {
+                int height = sandGrid[i][j];
+                for(int h = 0; h < height; h++) {
+                    Vector3 location = PositionAtGrid(i, j);
+                    location.y = h;
+                    DrawCube(location, 1, 1, 1, BLUE);
+                }
+            }
+        }
 
 
 
