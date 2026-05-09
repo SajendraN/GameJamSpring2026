@@ -353,9 +353,16 @@ void DrawTutorial() {
         DrawPlane( Vector3{0, 0, 0}, Vector2{50, 50}, SAND); // Simple world plane
 
         //reference trees
-        
-        DrawCube( Vector3{ 0, 1.5f, 0 }, 1, 1, 1, LIME);
-        DrawCube( Vector3{ 0, 0.5f, 0 }, 0.25f, 1, 0.25f, BROWN);
+        int count = 5;
+        float spacing = 4;
+        float backWall = count * spacing;
+        for (float x = -count * spacing; x <= count * spacing; x += spacing) {
+            DrawCube(Vector3{ x, 1.5f, backWall }, 1, 1, 1, LIME);
+            DrawCube(Vector3{ x, 0.5f, backWall }, 0.25f, 1, 0.25f, BROWN);
+
+            DrawCube(Vector3{ x + spacing/2, 1.5f, backWall + spacing / 2 }, 1, 1, 1, LIME);
+            DrawCube(Vector3{ x + spacing / 2, 0.5f, backWall + spacing / 2 }, 0.25f, 1, 0.25f, BROWN);
+        }
 
         //player cube
         DrawCube(cameraTutorial.position, 1, 1, 1, RED);
