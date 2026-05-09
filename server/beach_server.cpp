@@ -144,9 +144,15 @@ int main() {
     //worry about slow loading later
     InitTitleScreen(titleScreen, "title_screen", "wcscbg"); //worry about de-init and unload images later
 
+    InitAudioDevice();
+    Music theTrack = LoadMusicStream(ASSET_DIR"/music/complete_soundtrack.mp3");
+    SetMusicVolume(theTrack, 1.0);
+    PlayMusicStream(theTrack);
     
 
     while( !WindowShouldClose() ) {
+        UpdateMusicStream(theTrack);
+
         //CHECK INPUT
         
         // Move Server Circle (Keyboard)
@@ -197,6 +203,10 @@ int main() {
 
     server.stop();
     ix::uninitNetSystem();
+
+    UnloadMusicStream(theTrack);
+    CloseAudioDevice();
+
     return 0;
 }
 
