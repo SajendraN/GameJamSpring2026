@@ -4,3 +4,8 @@
 Websocket research I should have done earlier: https://share.google/aimode/JZ7hl00SIDsgVpG89
 RAG: "simple C websocket api library"
 
+
+"color sand not beige but.."
+"from raylib default colors, or color struct"
+--> // A more natural, pale desert sand color
+Color sand = { 236, 224, 191, 255 }; 

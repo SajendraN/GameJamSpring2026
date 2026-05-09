@@ -134,7 +134,15 @@ bool tutorialButtonWasPressed = false;
 void DrawCorrectGameMode(const GameMode& gm);
 void DrawUI();
 void DrawTitleScreen();
+void InitTutorial();
+void UpdateTutorial();
 void DrawTutorial();
+
+const Color SAND = { 236, 224, 191, 255 };
+
+// Setup player 1 camera and screen
+int cameraMode = CAMERA_FIRST_PERSON;
+Camera cameraTutorial;
 
 
 int main() {
@@ -283,9 +291,12 @@ void UpdateGameMode(GameMode& gm) {
     switch (gm) {
     case GAME_MODE_TITLE_SCREEN:
         UpdateTitleScreen(titleScreen);
-        if(tutorialButtonWasPressed)
+        if (tutorialButtonWasPressed) {
+            InitTutorial();
             gm = GAME_MODE_TUTORIAL;
-
+        }
+    case GAME_MODE_TUTORIAL:
+        UpdateTutorial();
     }
 }
 
@@ -316,9 +327,41 @@ void DrawUI() {
     }
 }
 
+void InitTutorial() {
+    cameraTutorial = { 0 };
+    cameraTutorial.fovy = 45.0f;
+    cameraTutorial.up.y = 1.0f;
+    cameraTutorial.target.y = 1.0f;
+    cameraTutorial.position.z = -3.0f;
+    cameraTutorial.position.y = 1.0f;
 
-void DrawTutorial() {
-    DrawText("This is a Tutorial...!", 20, 20, 30, WHITE);
+    DisableCursor();
 }
 
+void UpdateTutorial() {
+    // Update camera computes movement internally depending on the camera mode
+    // Some default standard keyboard/mouse inputs are hardcoded to simplify use
+    // For advanced camera controls, it's recommended to compute camera movement manually
+    UpdateCamera(&cameraTutorial, cameraMode);
+}
+
+void DrawTutorial() {
+    ClearBackground(SKYBLUE);
+    DrawText("This is a Tutorial...!", 20, 20, 30, WHITE);
+    BeginMode3D(cameraTutorial); {
+        // Draw scene: grid of cube trees on a plane to make a "world"
+        DrawPlane( Vector3{0, 0, 0}, Vector2{50, 50}, SAND); // Simple world plane
+
+        //reference trees
+        
+        DrawCube( Vector3{ 0, 1.5f, 0 }, 1, 1, 1, LIME);
+        DrawCube( Vector3{ 0, 0.5f, 0 }, 0.25f, 1, 0.25f, BROWN);
+
+        //player cube
+        DrawCube(cameraTutorial.position, 1, 1, 1, RED);
+
+
+
+    }EndMode3D();
+}
 
