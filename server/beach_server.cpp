@@ -100,14 +100,14 @@ enum GameMode {
 
 struct TitleSequence {
     //static const int NUM_FRAMES = 72;
-    static const int NUM_FRAMES = 7;
+    static const int NUM_FRAMES = 1;
     
     Texture2D frames[NUM_FRAMES];
 
     int currentFrame = 0;
 
     float timer = 0.0f;
-    float frameTime = 1 / 10.0f;
+    float frameTime = 1 / 5.0f;
 
     bool pingPong = true;
     bool reverse = false;
@@ -141,9 +141,20 @@ void DrawTutorial();
 
 const Color SAND_GROUND = { 236, 224, 191, 255 };
 const Color SAND_PACKED = { 215, 195, 145, 255 };
+const Color SAND_WET = { 180, 150, 110, 255 };
+const Color SAND_BRIGHT = { 255, 248, 230, 255 };
+
+const Color SAND_COLORS[] = { SAND_GROUND, SAND_PACKED, SAND_WET, SAND_BRIGHT };
+const int numSandColors = 4;
+int currentSandColor = 1;
+
 const int GRID_SIZE = 50;
 const float GRID_MID = GRID_SIZE / 2;
 int sandGrid[GRID_SIZE][GRID_SIZE] = { 0 };
+
+
+const int MAX_HEIGHT = 100;
+char sandGridColors[GRID_SIZE][GRID_SIZE][MAX_HEIGHT] = { 0 };
 
 Vector3 LocationAtGridPosition(int i, int j) {
     return Vector3{ -GRID_MID + i, 0, -GRID_MID + j};
@@ -163,6 +174,8 @@ Camera cameraTutorial;
 
 
 int main() {
+    std::fill(&sandGrid[0][0], &sandGrid[0][0] + sizeof(sandGrid) / sizeof(int), 1);
+
     ix::initNetSystem();
     ix::WebSocketServer server(PORT, "0.0.0.0");
     server.setOnConnectionCallback(OnClientConnection);
@@ -297,6 +310,7 @@ void UpdateTitleScreen(TitleSequence& seq) {
 
 void DrawTitleSequence(const TitleSequence& ts) {
     DrawTexture(ts.frames[ts.currentFrame], 0, 0, WHITE);
+    DrawText("Wierd Collaborative Sand Castle Building Game", 125, 500, 45, SAND_GROUND);
 }
 
 void DeInitTitleScreen(TitleSequence& ts) {
@@ -365,13 +379,17 @@ void UpdateTutorial() {
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         int i, j;
         GridPostionAtLocation(cameraTutorial.target, i, j);
+        if (i >= GRID_SIZE || j >= GRID_SIZE)
+            return;
         sandGrid[i][j]++;
+        sandGridColors[i][j][sandGrid[i][j]] = currentSandColor++;
+        currentSandColor %= numSandColors;
     }
 }
 
 void DrawTutorial() {
     ClearBackground(SKYBLUE);
-    DrawText("This is a Tutorial...!", 20, 20, 30, WHITE);
+    //DrawText("This is a Tutorial...!", 20, 20, 30, WHITE);
     BeginMode3D(cameraTutorial); {
         // Draw scene: line of cube trees on a plane to make a "world"
         DrawPlane( Vector3{0, 0, 0}, Vector2{50, 50}, SAND_GROUND); // Simple world plane
@@ -397,7 +415,8 @@ void DrawTutorial() {
                 for(int h = 0; h < height; h++) {
                     Vector3 location = LocationAtGridPosition(i, j);
                     location.y = h;
-                    DrawCube(location, 1, 1, 1, SAND_PACKED);
+                    Color thisColor = SAND_COLORS[sandGridColors[i][j][h]];
+                    DrawCube(location, 1, 1, 1, thisColor);
                 }
             }
         }
