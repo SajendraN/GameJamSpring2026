@@ -125,15 +125,18 @@ void UpdateWorldState(std::string data) {
     }
 }
 
+//#define URL "wss://tribune-dragonfly-roundworm.ngrok-free.dev"
+#define WS_URL "ws://192.168.140.92:8080"
+
 int main() {
     // 1. Networking Init
 #ifdef __EMSCRIPTEN__
-    EmscriptenWebSocketCreateAttributes attr = { "ws://localhost:9002", NULL, EM_TRUE };
+    EmscriptenWebSocketCreateAttributes attr = { WS_URL, NULL, EM_TRUE };
     wasmSocket = emscripten_websocket_new(&attr);
     emscripten_websocket_set_onmessage_callback(wasmSocket, NULL, OnWasmMessage);
 #else
     ix::initNetSystem();
-    nativeSocket.setUrl("ws://127.0.0.1:9002");
+    nativeSocket.setUrl(WS_URL);
     nativeSocket.setOnMessageCallback(OnNativeMessage);
     nativeSocket.start();
 #endif

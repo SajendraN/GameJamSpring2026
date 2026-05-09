@@ -71,10 +71,11 @@ void OnClientConnection(std::weak_ptr<ix::WebSocket> webSocket, std::shared_ptr<
     }
 }
 
+#define PORT 8080
 
 int main() {
     ix::initNetSystem();
-    ix::WebSocketServer server(9002, "0.0.0.0");
+    ix::WebSocketServer server(PORT, "0.0.0.0");
     server.setOnConnectionCallback(OnClientConnection);
 
     auto res = server.listen();
