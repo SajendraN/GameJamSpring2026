@@ -376,7 +376,7 @@ void UpdateTutorial() {
             continue;
         clientWavePositions[socket] = transformedPoint;
 
-        //printf("%f,%f --> %f,%f\n", pos.x, pos.y, transformedPoint.x, transformedPoint.y);
+        printf("%f,%f --> %f,%f\n", pos.x, pos.y, transformedPoint.x, transformedPoint.y);
 
         //map from client screen (0..500 to grid 0..50)
         Vector3 transformedPoint3D = { transformedPoint.x , 1, transformedPoint.y };
@@ -482,9 +482,17 @@ void DrawTutorial() {
 
         for (auto const& [socket, pos2D] : clientWavePositions) {
             Vector3 wavePos = { pos2D.x, 1, pos2D.y };
+            Vector3 pos2    = { pos2D.x - WAVE_HALF_SIZE, 1, -50 };
+            Vector3 pos3    = { pos2D.x + WAVE_HALF_SIZE, 1, -50 };
             
             DrawSphere(wavePos, 1, WATER);
-            //DrawTriangle(lastSent, { lastSent.x - WAVE_HALF_SIZE,500 }, { lastSent.x + WAVE_HALF_SIZE,500 }, WATER);
+            DrawSphere(pos2, 1, RED);
+            DrawSphere(pos3, 1, GREEN);
+            //DrawTriangle3D(wavePos, pos2, pos3, WATER);
+            DrawLine3D(wavePos, pos2, WATER);
+            DrawLine3D(pos2, pos3, WATER);
+            DrawLine3D(pos3, wavePos, WATER);
+            
         }
 
 
