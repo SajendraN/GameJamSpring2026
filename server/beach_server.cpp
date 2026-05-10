@@ -58,6 +58,7 @@ const static float broadcastTick = 1 / 25.0f;
 std::mutex dataMtx;
 Vector2 serverPos = { 0, 0 }; // Server's own circle
 std::map<ix::WebSocket*, Vector2> clientPositions;
+std::map<ix::WebSocket*, Vector2> clientWavePositions;
 
 void BroadcastPositions(ix::WebSocketServer& server) {
     static double lastBroadcast = 0;
@@ -93,7 +94,11 @@ void HandleClientMessage(std::shared_ptr<ix::WebSocket> socket, const ix::WebSoc
         float x, y;
         if (sscanf(msg->str.c_str(), "%f,%f", &x, &y) == 2) {
             std::lock_guard<std::mutex> lock(dataMtx);
-            clientPositions[socket.get()] = { x, y };
+            Vector2 oldVector = clientPositions[socket.get()];
+            if( Vector2Equals(oldVector, { x, y }) )
+                clientPositions.erase(socket.get());
+            else
+                clientPositions[socket.get()] = { x, y };
         }
     }
 }
@@ -164,6 +169,8 @@ void InitTutorial();
 void UpdateTutorial();
 void DrawTutorial();
 
+const float WAVE_HALF_SIZE = 5;
+const Color WATER = { 0, 0, 255, 200 };
 
 const Color SAND_GROUND = { 236, 224, 191, 255 };
 const Color SAND_GROUND2 = { 250, 235, 200, 255 };
@@ -357,14 +364,31 @@ void UpdateTutorial() {
     }
 
     //see what people have been erasing
+    static int waveClicks = 0;
     dataMtx.lock();
     for (auto const& [socket, pos] : clientPositions) {
+        if (pos.x < 0 || pos.y < 0)
+            continue;
+        //Vector3 wavePos = { -pos2D.x / 10, 1, -pos2D.y / 10 };
+        Vector2 transformedPoint = { (250 - pos.x)/10, (250 - pos.y)/10 }; //subtract center of plane
+        Vector2 oldWavePoint = clientWavePositions[socket];
+        if(Vector2Equals(transformedPoint, oldWavePoint))
+            continue;
+        clientWavePositions[socket] = transformedPoint;
+
+        //printf("%f,%f --> %f,%f\n", pos.x, pos.y, transformedPoint.x, transformedPoint.y);
+
         //map from client screen (0..500 to grid 0..50)
-        int i = roundf( Clamp( Remap(pos.x, 0, 500, 0, GRID_SIZE), 0, GRID_SIZE) );
-        int j = roundf( Clamp( Remap(pos.y, 0, 500, 0, GRID_SIZE), 0, GRID_SIZE) );
+        Vector3 transformedPoint3D = { transformedPoint.x , 1, transformedPoint.y };
+        int i, j;
+        GridPostionAtLocation(transformedPoint3D, i, j);
+               
+        
+        //printf("HIT %d --> %d , %d\n", waveClicks++, i, j);
+        
         
         if (sandGrid[i][j] > 1) {
-            printf("HIT: %d , %d\n", i, j);
+            //printf("HIT: %d , %d\n", i, j);
             sandGrid[i][j]--;
         }
         
@@ -440,9 +464,10 @@ void DrawTutorial() {
             DrawCube(Vector3{ x + spacing / 2, 0.5f, backWall + spacing / 2 }, 0.25f, 1, 0.25f, BROWN);
         }
 
-        //player cube
-        DrawCube(cameraTutorial.position, 1, 1, 1, RED);
-
+        //player cube, never gets used camera mode
+        //DrawCube(cameraTutorial.position, 1, 1, 1, RED);
+        
+        //built grid
         for(int i = 0; i < GRID_SIZE; i++) {
             for(int j = 0; j < GRID_SIZE; j++) {
                 int height = sandGrid[i][j];
@@ -453,6 +478,13 @@ void DrawTutorial() {
                     DrawCube(location, 1, 1, 1, thisColor);
                 }
             }
+        }
+
+        for (auto const& [socket, pos2D] : clientWavePositions) {
+            Vector3 wavePos = { pos2D.x, 1, pos2D.y };
+            
+            DrawSphere(wavePos, 1, WATER);
+            //DrawTriangle(lastSent, { lastSent.x - WAVE_HALF_SIZE,500 }, { lastSent.x + WAVE_HALF_SIZE,500 }, WATER);
         }
 
 

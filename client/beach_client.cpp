@@ -39,6 +39,7 @@
 #endif
 
 #include "raylib.h"
+#include "raymath.h"
 
 #include <string>
 #include <vector>
@@ -119,11 +120,13 @@ void UpdateWorldState(std::string data) {
 }
 
 //#define URL "wss://tribune-dragonfly-roundworm.ngrok-free.dev"
-#define WS_URL "ws://192.168.140.92:8080"
+//#define WS_URL "ws://192.168.140.92:8080"
 //#define WS_URL "ws://192.168.140.175:8080"
-//#define WS_URL "ws://192.168.86.38:8080"
+#define WS_URL "ws://192.168.86.38:8080"
 
 const Color SAND_GROUND = { 236, 224, 191, 255 };
+const Color WATER = { 0, 0, 255, 200 };
+const float WAVE_HALF_SIZE = 50;
 
 
 int main() {
@@ -157,7 +160,8 @@ int main() {
         bool mouseDown = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
         if (mouseDown) {
             Vector2 m = GetMousePosition();
-            if (m.x != lastSent.x || m.y != lastSent.y) {
+            if(!Vector2Equals(m, lastSent)) {
+            //if (m.x != lastSent.x || m.y != lastSent.y) {
                 SendPos(m.x, m.y);
                 lastSent = m;
             }
@@ -176,6 +180,7 @@ int main() {
 
             if (mouseDown) {
                 DrawCircleV(lastSent, 5, BLUE);
+                DrawTriangle(lastSent, {lastSent.x - WAVE_HALF_SIZE,500}, { lastSent.x + WAVE_HALF_SIZE,500}, WATER);
             }
 
 
