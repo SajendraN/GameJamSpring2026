@@ -35,6 +35,7 @@
 #include "raylib.h"
 #define RAYGUI_IMPLEMENTATION //only in this cpp file
 #include "raygui.h" // in any cpp file that needs it
+#include "raymath.h"
 
 #include <iostream>
 #include <string>
@@ -49,10 +50,34 @@
 // wsServer (server) ? 
 // mongoose.ws (client/server)
 
+//transmitting rate
+// 2. Broadcast Tick (20Hz) 0.05
+const static float broadcastTick = 1 / 25.0f;
+
 // --- State ---
 std::mutex dataMtx;
-Vector2 serverPos = { 400, 225 }; // Server's own circle
+Vector2 serverPos = { 0, 0 }; // Server's own circle
 std::map<ix::WebSocket*, Vector2> clientPositions;
+
+void BroadcastPositions(ix::WebSocketServer& server) {
+    static double lastBroadcast = 0;
+    double now = GetTime();
+    if (now - lastBroadcast >= broadcastTick) {
+        // Build one big string of all positions: "ServerX,ServerY|Client1X,Client1Y|..."
+        std::string packet = std::to_string(serverPos.x) + "," + std::to_string(serverPos.y);
+
+        dataMtx.lock();
+        for (auto const& [socket, pos] : clientPositions) {
+            packet += "|" + std::to_string(pos.x) + "," + std::to_string(pos.y);
+        }
+        dataMtx.unlock();
+
+        for (auto&& client : server.getClients()) {
+            client->sendText(packet);
+        }
+        lastBroadcast = now;
+    }
+}
 
 void HandleClientMessage(std::shared_ptr<ix::WebSocket> socket, const ix::WebSocketMessagePtr& msg) {
     if (msg->type == ix::WebSocketMessageType::Open) {
@@ -86,7 +111,7 @@ void OnClientConnection(std::weak_ptr<ix::WebSocket> webSocket, std::shared_ptr<
 
 
 
-//shit this should be shared client and server somehow, fix folder layout later
+//this should be shared client and server somehow, fix folder layout later
 enum GameMode {
     GAME_MODE_TITLE_SCREEN = 0,
     GAME_MODE_TUTORIAL,
@@ -134,6 +159,7 @@ bool tutorialButtonWasPressed = false;
 void DrawCorrectGameMode(const GameMode& gm);
 void DrawUI();
 void DrawTitleScreen();
+void DrawPlayerPositions();
 void InitTutorial();
 void UpdateTutorial();
 void DrawTutorial();
@@ -187,8 +213,8 @@ int main() {
         return 1;
     }
     server.start();
-    double lastBroadcast = 0;
-
+    BroadcastPositions(server);
+    
     InitWindow(1280, 720, "Server - Keys to Move");
     SetTargetFPS(60);
     GameMode currentGameMode = GAME_MODE_TITLE_SCREEN;
@@ -205,58 +231,23 @@ int main() {
     SetMusicVolume(theTrack, 1.0);
     PlayMusicStream(theTrack);
 
-    
-    
 
     while( !WindowShouldClose() ) {
         UpdateMusicStream(theTrack);
 
         //CHECK INPUT
-        
-        // Move Server Circle (Keyboard)
-        float speed = 200.0f * GetFrameTime();
-        if (IsKeyDown(KEY_RIGHT)) serverPos.x += speed;
-        if (IsKeyDown(KEY_LEFT))  serverPos.x -= speed;
-        if (IsKeyDown(KEY_UP))    serverPos.y -= speed;
-        if (IsKeyDown(KEY_DOWN))  serverPos.y += speed;
-
-
         //UPDATE
-        // 
+        // ETC
         UpdateGameMode(currentGameMode);
-        
-        // 2. Broadcast Tick (20Hz)
-        double now = GetTime();
-        if (now - lastBroadcast >= 0.05) {
-            // Build one big string of all positions: "ServerX,ServerY|Client1X,Client1Y|..."
-            std::string packet = std::to_string(serverPos.x) + "," + std::to_string(serverPos.y);
-
-            dataMtx.lock();
-            for (auto const& [socket, pos] : clientPositions) {
-                packet += "|" + std::to_string(pos.x) + "," + std::to_string(pos.y);
-            }
-            dataMtx.unlock();
-
-            for (auto&& client : server.getClients()) {
-                client->sendText(packet);
-            }
-            lastBroadcast = now;
-        }
+        BroadcastPositions(server);
+                
 
         //DRAW
         BeginDrawing(); {
             ClearBackground(BLACK);
             DrawCorrectGameMode(currentGameMode);
 
-
-            DrawCircleV(serverPos, 25, RED); // Server is Red
-            DrawText("SERVER (YOU)", serverPos.x - 30, serverPos.y + 30, 10, RED);
-
-            dataMtx.lock();
-            for (auto const& [socket, pos] : clientPositions) {
-                DrawCircleV(pos, 20, BLUE); // Clients are Blue
-            }
-            dataMtx.unlock();
+            
         } EndDrawing();
     }
 
@@ -269,6 +260,22 @@ int main() {
     return 0;
 }
 
+void UpdateGameMode(GameMode& gm) {
+    switch (gm) {
+    case GAME_MODE_TITLE_SCREEN:
+        UpdateTitleScreen(titleScreen);
+        if (tutorialButtonWasPressed) {
+            InitTutorial();
+            gm = GAME_MODE_TUTORIAL;
+        }
+        break;
+    case GAME_MODE_TUTORIAL:
+        UpdateTutorial();
+        break;
+    }
+}
+
+
 void InitTitleScreen(TitleSequence &ts, const char* sub_folder, const char* filenamebase) {
     for (int i = 0; i < ts.NUM_FRAMES; i++) {
         const char* path = TextFormat("%s/%s/%s_%03d.png", ASSET_DIR, sub_folder, filenamebase);
@@ -280,9 +287,32 @@ void InitTitleScreen(TitleSequence &ts, const char* sub_folder, const char* file
     }
 }
 
+void DeInitTitleScreen(TitleSequence& ts) {
+    for (Texture2D& texture : ts.frames)
+        UnloadTexture(texture);
+}
+
+void InitTutorial() {
+    cameraTutorial = { 0 };
+    cameraTutorial.fovy = 45.0f;
+    cameraTutorial.up.y = 1.0f;
+    cameraTutorial.target.y = 1.0f;
+    cameraTutorial.position.z = -3.0f;
+    cameraTutorial.position.y = 1.0f;
+
+    DisableCursor();
+}
+
 void UpdateTitleScreen(TitleSequence& seq) {
-    seq.timer += GetFrameTime();
+    // Move Server Circle (Keyboard)
+    float speed = 200.0f * GetFrameTime();
+    if (IsKeyDown(KEY_RIGHT)) serverPos.x += speed;
+    if (IsKeyDown(KEY_LEFT))  serverPos.x -= speed;
+    if (IsKeyDown(KEY_UP))    serverPos.y -= speed;
+    if (IsKeyDown(KEY_DOWN))  serverPos.y += speed;
+
     
+    seq.timer += GetFrameTime();
     if (seq.timer >= seq.frameTime) {
         seq.timer -= seq.frameTime;
 
@@ -309,30 +339,40 @@ void UpdateTitleScreen(TitleSequence& seq) {
     } //end timer wait
 }//end update title screen
 
-void DrawTitleSequence(const TitleSequence& ts) {
-    DrawTexture(ts.frames[ts.currentFrame], 0, 0, WHITE);
-    DrawText("Wierd Collaborative Sand Castle Building Game", 125, 500, 45, SAND_GROUND);
-}
 
-void DeInitTitleScreen(TitleSequence& ts) {
-    for (Texture2D& texture : ts.frames)
-        UnloadTexture(texture);
-}
 
-void UpdateGameMode(GameMode& gm) {
-    switch (gm) {
-    case GAME_MODE_TITLE_SCREEN:
-        UpdateTitleScreen(titleScreen);
-        if (tutorialButtonWasPressed) {
-            InitTutorial();
-            gm = GAME_MODE_TUTORIAL;
-        }
-        break;
-    case GAME_MODE_TUTORIAL:
-        UpdateTutorial();
-        break;
+void UpdateTutorial() {
+    // Update camera computes movement internally depending on the camera mode
+    // Some default standard keyboard/mouse inputs are hardcoded to simplify use
+    // For advanced camera controls, it's recommended to compute camera movement manually
+    UpdateCamera(&cameraTutorial, cameraMode);
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        int i, j;
+        GridPostionAtLocation(cameraTutorial.target, i, j);
+        if (i >= GRID_SIZE || j >= GRID_SIZE)
+            return;
+        sandGridColors[i][j][sandGrid[i][j]] = currentSandColor++;
+        sandGrid[i][j]++;
+        currentSandColor %= numSandColors;
     }
+
+    //see what people have been erasing
+    dataMtx.lock();
+    for (auto const& [socket, pos] : clientPositions) {
+        //map from client screen (0..500 to grid 0..50)
+        int i = roundf( Clamp( Remap(pos.x, 0, 500, 0, GRID_SIZE), 0, GRID_SIZE) );
+        int j = roundf( Clamp( Remap(pos.y, 0, 500, 0, GRID_SIZE), 0, GRID_SIZE) );
+        
+        if (sandGrid[i][j] > 1) {
+            printf("HIT: %d , %d\n", i, j);
+            sandGrid[i][j]--;
+        }
+        
+    }
+    dataMtx.unlock();
+
 }
+
 
 void DrawCorrectGameMode(const GameMode& gm) {
     switch (gm) {
@@ -351,8 +391,26 @@ void DrawCorrectGameMode(const GameMode& gm) {
 
 void DrawTitleScreen() {
     DrawTitleSequence(titleScreen);
+    DrawPlayerPositions();
     DrawUI();
 }
+
+void DrawPlayerPositions() {
+    DrawCircleV(serverPos, 25, RED); // Server is Red
+    DrawText("SERVER (YOU)", serverPos.x - 30, serverPos.y + 30, 10, RED);
+
+    dataMtx.lock();
+    for (auto const& [socket, pos] : clientPositions) {
+        DrawCircleV(pos, 20, BLUE); // Clients are Blue
+    }
+    dataMtx.unlock();
+}
+
+void DrawTitleSequence(const TitleSequence& ts) {
+    DrawTexture(ts.frames[ts.currentFrame], 0, 0, WHITE);
+    DrawText("Wierd Collaborative Sand Castle Building Game", 125, 500, 45, SAND_GROUND);
+}
+
 
 void DrawUI() {
     if (showTutorialButton && GuiButton(Rectangle{ 1100, 100, 120, 24 }, "TUTORIAL")) {
@@ -361,32 +419,7 @@ void DrawUI() {
     }
 }
 
-void InitTutorial() {
-    cameraTutorial = { 0 };
-    cameraTutorial.fovy = 45.0f;
-    cameraTutorial.up.y = 1.0f;
-    cameraTutorial.target.y = 1.0f;
-    cameraTutorial.position.z = -3.0f;
-    cameraTutorial.position.y = 1.0f;
 
-    DisableCursor();
-}
-
-void UpdateTutorial() {
-    // Update camera computes movement internally depending on the camera mode
-    // Some default standard keyboard/mouse inputs are hardcoded to simplify use
-    // For advanced camera controls, it's recommended to compute camera movement manually
-    UpdateCamera(&cameraTutorial, cameraMode);
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        int i, j;
-        GridPostionAtLocation(cameraTutorial.target, i, j);
-        if (i >= GRID_SIZE || j >= GRID_SIZE)
-            return;
-        sandGridColors[i][j][sandGrid[i][j]] = currentSandColor++;
-        sandGrid[i][j]++;
-        currentSandColor %= numSandColors;
-    }
-}
 
 void DrawTutorial() {
     ClearBackground(SKYBLUE);

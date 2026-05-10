@@ -58,7 +58,6 @@ struct {
     std::mutex mtx;
 } inbox;
 
-
 std::vector<PlayerCircle> worldState;
 
 // --- NETWORK CALLBACKS ---
@@ -79,9 +78,7 @@ void OnNativeMessage(const ix::WebSocketMessagePtr& msg) {
 }
 #endif
 
-
 // --- CLEAN INTERFACE FUNCTIONS ---
-
 void NetSend(const std::string& msg) {
 #ifdef __EMSCRIPTEN__
     emscripten_websocket_send_utf8_text(wasmSocket, msg.c_str());
@@ -97,7 +94,6 @@ void SendPos(float x, float y) {
     NetSend(msg); // Logic passes through the universal sender
 }
 
-
 bool NetConnected() {
 #ifdef __EMSCRIPTEN__
     return true; // Simple assumption for Wasm
@@ -105,9 +101,6 @@ bool NetConnected() {
     return nativeSocket.getReadyState() == ix::ReadyState::Open;
 #endif
 }
-
-
-
 
 // --- LOGIC ---
 void UpdateWorldState(std::string data) {
@@ -126,8 +119,9 @@ void UpdateWorldState(std::string data) {
 }
 
 //#define URL "wss://tribune-dragonfly-roundworm.ngrok-free.dev"
-//#define WS_URL "ws://192.168.140.92:8080"
-#define WS_URL "ws://192.168.140.175:8080"
+#define WS_URL "ws://192.168.140.92:8080"
+//#define WS_URL "ws://192.168.140.175:8080"
+//#define WS_URL "ws://192.168.86.38:8080"
 
 const Color SAND_GROUND = { 236, 224, 191, 255 };
 
@@ -159,13 +153,15 @@ int main() {
         inbox.mtx.unlock();
 
         // --- INPUT: Send mouse position if moved ---
-        Vector2 m = GetMousePosition();
-        static Vector2 lastSent = { 0,0 };
-        if (m.x != lastSent.x || m.y != lastSent.y) {
-            SendPos(m.x, m.y);
-            lastSent = m;
+        static Vector2 lastSent = { 0, 0 };
+        bool mouseDown = IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+        if (mouseDown) {
+            Vector2 m = GetMousePosition();
+            if (m.x != lastSent.x || m.y != lastSent.y) {
+                SendPos(m.x, m.y);
+                lastSent = m;
+            }
         }
-
         // --- DRAW ---
         BeginDrawing();
             ClearBackground(SAND_GROUND);
@@ -178,9 +174,13 @@ int main() {
                 DrawPoly(Vector2{ i * 50.0f + 30, 15 },13, 15, -90, GREEN);
             }
 
+            if (mouseDown) {
+                DrawCircleV(lastSent, 5, BLUE);
+            }
+
 
             for (const auto& player : worldState) {
-                DrawCircleV(player.pos, 20, player.color);
+                //DrawCircleV(player.pos, 20, player.color);
             }
             if( !NetConnected() ) 
                 DrawText("OFFLINE", 10, 10, 20, RED);
